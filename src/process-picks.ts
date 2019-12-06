@@ -79,7 +79,7 @@ async function main(): Promise<string> {
     'https://docs.google.com/spreadsheets/d/e/2PACX-1vS0RBycTbJhVVtEQv4WlC1UcZpHZSyP7ym71eTiOH45NXX_3gtfFp-IQggBr0fseqavRq-thurRdvuO/pub?output=xlsx';
   const url: string = !argv.source
     ? defaultURL
-    : ((argv.source as string) || defaultURL).toString();
+    : (argv.source as string) || defaultURL;
 
   const skip: number =
     typeof argv.skip === 'undefined' ? 1 : parseInt(argv.skip as string, 10);
