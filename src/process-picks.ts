@@ -11,7 +11,32 @@ interface CustomSheet {
   name: string;
 }
 
-const COLS = {
+interface AlbumRating {
+  artist: string;
+  album: string;
+  points: number;
+  sources: number[];
+  votesForItem: number;
+  totalScoreForItem: number;
+  averge: number;
+  averageRating: number;
+  bayesianWeightedRank: number;
+}
+
+interface AlbumRatingsCollection {
+  [key: string]: AlbumRating;
+}
+
+interface MemberRatings {
+  raw: XLSX.WorkSheet;
+  name: string;
+  bySlug: { [key: string]: number };
+}
+interface ColMap {
+  [key: string]: string;
+}
+
+const COLS: ColMap = {
   RANK: 'A',
   ARTIST: 'B',
   ALBUM: 'C',
@@ -26,11 +51,26 @@ function getCell(sheet, col, row): string | number | boolean {
   return cell.v;
 }
 
-function makeSlug(thing: string): string {
-  return unidecode(thing)
+function makeSlug(thing: string | string[]): string {
+  const ar: string[] = Array.isArray(thing) ? thing : [thing];
+  return unidecode(ar.join('-'))
     .toLowerCase()
     .trim()
     .replace(/[^a-z]+/, '-');
+}
+
+function getBaseRating(): AlbumRating {
+  return {
+    points: 0,
+    sources: [],
+    artist: '',
+    album: '',
+    votesForItem: 0,
+    totalScoreForItem: 0,
+    averageRating: 0,
+    bayesianWeightedRank: 0,
+    averge: 0,
+  };
 }
 
 async function main(): Promise<string> {
@@ -45,7 +85,7 @@ async function main(): Promise<string> {
     typeof argv.skip === 'undefined' ? 1 : parseInt(argv.skip as string, 10);
 
   const res = await fetch(url);
-  const raw = await res.buffer();
+  const raw: Buffer = await res.buffer();
   const wb: XLSX.WorkBook = XLSX.read(raw, { type: 'buffer' });
   const sheets = wb.SheetNames.map((sheetName: string) => {
     const sheet: XLSX.WorkSheet = wb.Sheets[sheetName];
@@ -57,18 +97,12 @@ async function main(): Promise<string> {
   });
 
   const membersByName = {};
-  const scores = {};
+  const scores: AlbumRatingsCollection = {};
 
   const MAX_ALBUMS = 10;
   let usersWhoRated = 0;
   const usernames: string[] = [];
   sheets.forEach(s => {
-    interface MemberRatings {
-      raw: XLSX.WorkSheet;
-      name: string;
-      bySlug: any;
-    }
-
     const member: MemberRatings = {
       raw: s.sheet,
       name: s.name,
@@ -76,6 +110,7 @@ async function main(): Promise<string> {
     };
 
     membersByName[s.name] = member;
+    // Skips sheets with leading underscore
     if (/^[^_]/.test(s.name)) {
       usersWhoRated++;
       usernames.push(s.name);
@@ -84,20 +119,17 @@ async function main(): Promise<string> {
           getCell(s.sheet, COLS.RANK, row).toString(),
           10,
         );
-        const artist = getCell(s.sheet, COLS.ARTIST, row);
-        const album = getCell(s.sheet, COLS.ALBUM, row);
+        const artist: string = getCell(s.sheet, COLS.ARTIST, row).toString();
+        const album: string = getCell(s.sheet, COLS.ALBUM, row).toString();
         if (rank && artist && album) {
-          const slug = makeSlug(`${artist}-${album}`);
+          const slug = makeSlug([artist, album]);
 
           const score = MAX_ALBUMS - rank + 1;
           member.bySlug[slug] = score;
           if (!scores[slug]) {
-            scores[slug] = {
-              points: 0,
-              sources: [],
-              artist,
-              album,
-            };
+            scores[slug] = getBaseRating();
+            scores[slug].artist = artist;
+            scores[slug].album = album;
           }
           scores[slug].points += score;
           scores[slug].sources.push(score);
@@ -109,7 +141,6 @@ async function main(): Promise<string> {
   let totalVotesCast = 0;
   let totalRatings = 0;
 
-  // foreach my $slug (keys %{ $scores }) {
   Object.keys(scores).forEach(slug => {
     scores[slug].votesForItem = scores[slug].sources.length;
     scores[slug].totalScoreForItem = scores[slug].sources.reduce(
@@ -128,7 +159,6 @@ async function main(): Promise<string> {
       .reduce((p, c) => p + c, 0) / Object.keys(scores).length;
   const averageNumberVotesTotal = totalVotesCast / Object.keys(scores).length;
 
-  // foreach my $slug (keys %{ $scores }) {
   Object.keys(scores).forEach(slug => {
     const item = scores[slug];
     scores[slug].bayesianWeightedRank =
@@ -138,7 +168,7 @@ async function main(): Promise<string> {
   });
 
   const sortBy = 'bayesianWeightedRank';
-  const allScores: any[] = [];
+  const allScores: AlbumRating[] = [];
   Object.keys(scores).forEach(slug => {
     allScores.push(scores[slug]);
   });

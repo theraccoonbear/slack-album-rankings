@@ -7,7 +7,7 @@
 
 If your spreadsheets are setup correctly you should be set.
 ### Custom Alternative
-Get a published CSV URL from Sheets and:
+Get a published `.XLSX` URL from Sheets and:
 
 `yarn start --source <your-sheets-url>`
 
