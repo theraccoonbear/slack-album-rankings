@@ -1,0 +1,36 @@
+{
+  "name": "slack-pick-ranker",
+  "version": "1.0.0",
+  "description": "Ranks EOY Slack metal picks with Bayesian weighting",
+  "main": "index.js",
+  "author": "Don",
+  "license": "MIT",
+  "scripts": {
+    "build": "./node_modules/.bin/tsc",
+    "build:watch": "yarn build -w",
+    "start": "node dist/process-picks.js",
+    "lint": "tsc --noEmit && eslint '*/**/*.{js,ts,tsx}' --quiet",
+    "lint:fix": "yarn lint --fix"
+  },
+  "dependencies": {
+    "@types/node": "^12.12.14",
+    "@types/node-fetch": "^2.5.4",
+    "@types/sprintf-js": "^1.1.2",
+    "@types/xlsx": "^0.0.36",
+    "@types/yargs": "^13.0.3",
+    "node-fetch": "^2.6.0",
+    "sprintf-js": "^1.1.2",
+    "typescript": "^3.7.3",
+    "unidecode": "^0.1.8",
+    "xlsx": "^0.15.3",
+    "yargs": "^15.0.2"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^2.10.0",
+    "@typescript-eslint/parser": "^2.10.0",
+    "eslint": "^6.7.2",
+    "eslint-config-prettier": "^6.7.0",
+    "eslint-plugin-prettier": "^3.1.1",
+    "prettier": "^1.19.1"
+  }
+}
