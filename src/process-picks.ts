@@ -53,9 +53,8 @@ function getCell(sheet, col, row): string | number | boolean {
 
 function makeSlug(thing: string | string[]): string {
   const ar: string[] = Array.isArray(thing) ? thing : [thing];
-  return unidecode(ar.join('-'))
+  return unidecode(ar.map(s => s.trim()).join('-'))
     .toLowerCase()
-    .trim()
     .replace(/[^a-z]+/, '-');
 }
 
