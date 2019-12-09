@@ -149,7 +149,9 @@ async function main(): Promise<string> {
             scores[slug].artist = artist;
             scores[slug].album = album;
           }
-          scores[slug].url = scores[slug].url || url;
+          if (url && !!url !== false && url !== 'false') {
+            scores[slug].url = url;
+          }
           scores[slug].points += score;
           scores[slug].sources.push(score);
         }
@@ -234,7 +236,7 @@ async function main(): Promise<string> {
       rel.averageRating,
       rel.votesForItem,
       rel.bayesianWeightedRank,
-      rel.url,
+      rel.url || '',
     );
     // const entry = sprintf(
     //   '%2s. *%s* - _%s_ %.01f/10 (%s votes; %.01f)',
