@@ -3,6 +3,7 @@ import fetch from 'node-fetch';
 import XLSX from 'xlsx';
 import unidecode from 'unidecode';
 import { sprintf } from 'sprintf-js';
+import { type } from 'os';
 
 const argv = yargs.argv;
 
@@ -14,8 +15,11 @@ interface CustomSheet {
 interface AlbumRating {
   artist: string;
   album: string;
+  url: string;
+  cover: string;
   points: number;
   sources: number[];
+  slug: string;
   votesForItem: number;
   totalScoreForItem: number;
   averge: number;
@@ -35,6 +39,10 @@ interface MemberRatings {
 interface ColMap {
   [key: string]: string;
 }
+interface SortOrder {
+  field: string;
+  reverse: boolean;
+}
 
 const COLS: ColMap = {
   RANK: 'A',
@@ -42,6 +50,12 @@ const COLS: ColMap = {
   ALBUM: 'C',
   URL: 'D',
 };
+
+const sortKeys: (string | SortOrder)[] = [
+  'bayesianWeightedRank',
+  { field: 'artist', reverse: true },
+  { field: 'album', reverse: true },
+];
 
 function getCell(sheet, col, row): string | number | boolean {
   const cell = sheet[`${col}${row}`];
@@ -55,7 +69,7 @@ function makeSlug(thing: string | string[]): string {
   const ar: string[] = Array.isArray(thing) ? thing : [thing];
   return unidecode(ar.map(s => s.trim()).join('-'))
     .toLowerCase()
-    .replace(/[^a-z]+/, '-');
+    .replace(/[^a-z]+/gi, '-');
 }
 
 function getBaseRating(): AlbumRating {
@@ -64,6 +78,9 @@ function getBaseRating(): AlbumRating {
     sources: [],
     artist: '',
     album: '',
+    slug: '',
+    url: '',
+    cover: '',
     votesForItem: 0,
     totalScoreForItem: 0,
     averageRating: 0,
@@ -120,6 +137,7 @@ async function main(): Promise<string> {
         );
         const artist: string = getCell(s.sheet, COLS.ARTIST, row).toString();
         const album: string = getCell(s.sheet, COLS.ALBUM, row).toString();
+        const url: string = getCell(s.sheet, COLS.URL, row).toString();
         if (rank && artist && album) {
           const slug = makeSlug([artist, album]);
 
@@ -127,9 +145,11 @@ async function main(): Promise<string> {
           member.bySlug[slug] = score;
           if (!scores[slug]) {
             scores[slug] = getBaseRating();
+            scores[slug].slug = slug;
             scores[slug].artist = artist;
             scores[slug].album = album;
           }
+          scores[slug].url = scores[slug].url || url;
           scores[slug].points += score;
           scores[slug].sources.push(score);
         }
@@ -166,16 +186,19 @@ async function main(): Promise<string> {
       (averageNumberVotesTotal + item.votesForItem);
   });
 
-  const sortBy = 'bayesianWeightedRank';
   const allScores: AlbumRating[] = [];
   Object.keys(scores).forEach(slug => {
     allScores.push(scores[slug]);
   });
   allScores.sort((a, b) => {
-    if (a[sortBy] < b[sortBy]) {
-      return 1;
-    } else if (a[sortBy] > b[sortBy]) {
-      return -1;
+    for (const sortBy of sortKeys) {
+      const key = typeof sortBy === 'string' ? sortBy : sortBy.field;
+      const order: number = typeof sortBy === 'string' ? 1 : -1;
+      if (a[key] < b[key]) {
+        return order;
+      } else if (a[key] > b[key]) {
+        return -order;
+      }
     }
     return 0;
   });
@@ -196,17 +219,33 @@ async function main(): Promise<string> {
   allScores.forEach(rel => {
     rel.averge = rel.points / rel.sources.length;
     count++;
-    report.push(
-      sprintf(
-        '%2s. *%s* - _%s_ %.01f/10 (%s votes; %.01f)',
-        count,
-        rel.artist,
-        rel.album,
-        rel.averageRating,
-        rel.votesForItem,
-        rel[sortBy],
-      ),
+    // const entry = sprintf(
+    //   '%2s. %s - %s [%s]',
+    //   count,
+    //   rel.artist,
+    //   rel.album,
+    //   rel.slug,
+    // );
+    const entry = sprintf(
+      '%2s. *%s* - _%s_ %.01f/10 (%s votes; %.01f) %s',
+      count,
+      rel.artist,
+      rel.album,
+      rel.averageRating,
+      rel.votesForItem,
+      rel.bayesianWeightedRank,
+      rel.url,
     );
+    // const entry = sprintf(
+    //   '%2s. *%s* - _%s_ %.01f/10 (%s votes; %.01f)',
+    //   count,
+    //   rel.artist,
+    //   rel.album,
+    //   rel.averageRating,
+    //   rel.votesForItem,
+    //   rel.bayesianWeightedRank,
+    // );
+    report.push(entry);
   });
 
   console.log(report.join('\n'));
