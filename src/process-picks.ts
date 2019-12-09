@@ -3,7 +3,6 @@ import fetch from 'node-fetch';
 import XLSX from 'xlsx';
 import unidecode from 'unidecode';
 import { sprintf } from 'sprintf-js';
-import { type } from 'os';
 
 const argv = yargs.argv;
 
