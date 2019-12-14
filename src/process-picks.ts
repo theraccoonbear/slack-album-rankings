@@ -2,6 +2,7 @@ import yargs from 'yargs';
 import fetch from 'node-fetch';
 import XLSX from 'xlsx';
 import unidecode from 'unidecode';
+import handlebars from 'handlebars';
 import { sprintf } from 'sprintf-js';
 
 const argv = yargs.argv;
