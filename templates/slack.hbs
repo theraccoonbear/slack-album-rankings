@@ -1,3 +1,12 @@
+{{#totals}}
+*Total Votes Cast:* {{totalVotesCast}}
+*Total Ratings:* {{totalRatings}}
+*Avg Rating Total:* {{totalAverageRating}}
+*Avg Votes Total:* {{averageNumberVotesTotal}}
+*Users Who Voted:* {{usersWhoRated}}
+*Voting Users:* {{joiner usernames ', '}}
+{{/totals}}
+
 {{#each picks}}
-{{count}} *{{artist}}* - _{{album}}_ {{averageRating}}/10 ({{votesForItem}} votes; {{bayesianWeightedRank}})
+{{sprintf '%2s.' place}} *{{artist}}* - _{{album}}_ {{sprintf '%0.1f' averageRating}}/10 ({{votesForItem}} votes; {{sprintf '%0.1f' bayesianWeightedRank}}) {{url}}
 {{/each}}

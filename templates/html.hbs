@@ -1,0 +1,30 @@
+<html>
+  <head>
+    <title>2019 Slacker Picks</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" />
+    <meta charset="utf-8"/>
+  </head>
+  <body>
+    <div class="container">
+      <div class="row">
+        <div class="col-xs-12">
+          <h1>2019 Slacker Picks</h1>
+          {{#totals}}
+          <strong>Total Votes Cast:</strong> {{totalVotesCast}}<br>
+          <strong>Total Ratings:</strong> {{totalRatings}}<br>
+          <strong>Avg Rating Total:</strong> {{totalAverageRating}}<br>
+          <strong>Avg Votes Total:</strong> {{averageNumberVotesTotal}}<br>
+          <strong>Users Who Voted:</strong> {{usersWhoRated}}<br>
+          <strong>Voting Users:</strong> {{joiner usernames ', '}}<br>
+          {{/totals}}
+
+          <ol>
+          {{#each picks}}
+            <li>{{#if url}}<a href="{{url}}" target="_blank">{{/if}}<strong>{{artist}}</strong> - <em>{{album}}</em> {{sprintf '%0.1f' averageRating}}/10 ({{votesForItem}} votes; {{sprintf '%0.1f' bayesianWeightedRank}}){{#if url}}</a>{{/if}}</li>
+          {{/each}}
+          </ol>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

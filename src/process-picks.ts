@@ -1,9 +1,19 @@
+import * as cbfs from 'fs';
+import util from 'util';
+import path from 'path';
 import yargs from 'yargs';
 import fetch from 'node-fetch';
 import XLSX from 'xlsx';
 import unidecode from 'unidecode';
-import handlebars from 'handlebars';
+import Handlebars from 'handlebars';
 import { sprintf } from 'sprintf-js';
+
+const fs = {
+  readFile: util.promisify(cbfs.readFile),
+  writeFile: util.promisify(cbfs.writeFile),
+  exists: util.promisify(cbfs.exists),
+  readdir: util.promisify(cbfs.readdir),
+};
 
 const argv = yargs.argv;
 
@@ -17,6 +27,7 @@ interface AlbumRating {
   album: string;
   url: string;
   cover: string;
+  place: number;
   points: number;
   sources: number[];
   slug: string;
@@ -57,6 +68,14 @@ const sortKeys: (string | SortOrder)[] = [
   { field: 'album', reverse: true },
 ];
 
+Handlebars.registerHelper('joiner', (data, joinWith = ', ') => {
+  return (data as string[]).join(joinWith.toString());
+});
+
+Handlebars.registerHelper('sprintf', (templateString, ...data) => {
+  return sprintf(templateString.toString(), ...data);
+});
+
 function getCell(sheet, col, row): string | number | boolean {
   const cell = sheet[`${col}${row}`];
   if (!cell) {
@@ -86,10 +105,21 @@ function getBaseRating(): AlbumRating {
     averageRating: 0,
     bayesianWeightedRank: 0,
     averge: 0,
+    place: 0,
   };
 }
 
-async function main(): Promise<string> {
+async function render(templateName: string, data): Promise<string> {
+  const tmplPath: string = path.join('templates', `${templateName}.hbs`);
+  if (!(await fs.exists(tmplPath))) {
+    throw new Error(`Cannot find template ${tmplPath}`);
+  }
+  const rawTmpl = await fs.readFile(tmplPath, { encoding: 'utf8' });
+  const tmpl = Handlebars.compile(rawTmpl);
+  return tmpl(data);
+}
+
+async function main(): Promise<void> {
   const report: string[] = [];
   const defaultURL =
     'https://docs.google.com/spreadsheets/d/e/2PACX-1vS0RBycTbJhVVtEQv4WlC1UcZpHZSyP7ym71eTiOH45NXX_3gtfFp-IQggBr0fseqavRq-thurRdvuO/pub?output=xlsx';
@@ -100,9 +130,17 @@ async function main(): Promise<string> {
   const skip: number =
     typeof argv.skip === 'undefined' ? 1 : parseInt(argv.skip as string, 10);
 
+  console.log('Fetching data...');
   const res = await fetch(url);
   const raw: Buffer = await res.buffer();
+  console.log(`...fetched ${(raw.length / 1024).toFixed(1)}Kbytes`);
+  console.log('Reading workbook...');
   const wb: XLSX.WorkBook = XLSX.read(raw, { type: 'buffer' });
+  console.log(
+    `Read ${wb.SheetNames.length} worksheet${
+      wb.SheetNames.length === 1 ? '' : 's'
+    }`,
+  );
   const sheets = wb.SheetNames.map((sheetName: string) => {
     const sheet: XLSX.WorkSheet = wb.Sheets[sheetName];
     const cs: CustomSheet = {
@@ -117,7 +155,7 @@ async function main(): Promise<string> {
 
   const MAX_ALBUMS = 10;
   let usersWhoRated = 0;
-  const usernames: string[] = [];
+  const allVotingUsernames: string[] = [];
   sheets.forEach(s => {
     const member: MemberRatings = {
       raw: s.sheet,
@@ -128,16 +166,23 @@ async function main(): Promise<string> {
     membersByName[s.name] = member;
     // Skips sheets with leading underscore
     if (/^[^_]/.test(s.name)) {
+      console.log(`Processing ${s.name}...`);
       usersWhoRated++;
-      usernames.push(s.name);
+      allVotingUsernames.push(s.name);
       for (let row = 1 + skip; row < MAX_ALBUMS + 1 + skip; row++) {
         const rank: number = parseInt(
           getCell(s.sheet, COLS.RANK, row).toString(),
           10,
         );
-        const artist: string = getCell(s.sheet, COLS.ARTIST, row).toString();
-        const album: string = getCell(s.sheet, COLS.ALBUM, row).toString();
-        const url: string = getCell(s.sheet, COLS.URL, row).toString();
+        const artist: string = getCell(s.sheet, COLS.ARTIST, row)
+          .toString()
+          .trim();
+        const album: string = getCell(s.sheet, COLS.ALBUM, row)
+          .toString()
+          .trim();
+        const url: string = getCell(s.sheet, COLS.URL, row)
+          .toString()
+          .trim();
         if (rank && artist && album) {
           const slug = makeSlug([artist, album]);
 
@@ -162,6 +207,8 @@ async function main(): Promise<string> {
   let totalVotesCast = 0;
   let totalRatings = 0;
 
+  console.log('');
+  console.log('Calculating album averages...');
   Object.keys(scores).forEach(slug => {
     scores[slug].votesForItem = scores[slug].sources.length;
     scores[slug].totalScoreForItem = scores[slug].sources.reduce(
@@ -172,21 +219,37 @@ async function main(): Promise<string> {
     totalRatings += scores[slug].totalScoreForItem;
     scores[slug].averageRating =
       scores[slug].totalScoreForItem / scores[slug].votesForItem;
+
+    console.log(
+      `${slug} => ${'☑'.repeat(scores[slug].sources.length)} => ${scores[
+        slug
+      ].averageRating.toFixed(1)}/10`,
+    );
   });
 
+  console.log('Calculating total average rating...');
   const totalAverageRating =
     Object.keys(scores)
       .map(s => scores[s].averageRating)
       .reduce((p, c) => p + c, 0) / Object.keys(scores).length;
   const averageNumberVotesTotal = totalVotesCast / Object.keys(scores).length;
 
+  console.log('Weighting rankings...');
   Object.keys(scores).forEach(slug => {
     const item = scores[slug];
     scores[slug].bayesianWeightedRank =
       (averageNumberVotesTotal * totalAverageRating +
         item.votesForItem * item.totalScoreForItem) /
       (averageNumberVotesTotal + item.votesForItem);
+    console.log(
+      `${slug} => ${item.averageRating.toFixed(1)}/10 via ${
+        item.votesForItem
+      } votes ∴ ${item.bayesianWeightedRank.toFixed(1)}`,
+    );
   });
+
+  console.log('');
+  console.log('Sorting...');
 
   const allScores: AlbumRating[] = [];
   Object.keys(scores).forEach(slug => {
@@ -196,62 +259,64 @@ async function main(): Promise<string> {
     for (const sortBy of sortKeys) {
       const key = typeof sortBy === 'string' ? sortBy : sortBy.field;
       const order: number = typeof sortBy === 'string' ? 1 : -1;
-      if (a[key] < b[key]) {
+
+      const aVal = typeof a[key] === 'string' ? a[key].toLowerCase() : a[key];
+      const bVal = typeof b[key] === 'string' ? b[key].toLowerCase() : b[key];
+
+      if (aVal < bVal) {
         return order;
-      } else if (a[key] > b[key]) {
+      } else if (aVal > bVal) {
         return -order;
       }
     }
     return 0;
   });
 
-  report.push(`
-*Total Votes Cast:* ${totalVotesCast}
-*Total Ratings:* ${totalRatings}
-*Avg Rating Total:* ${totalAverageRating}
-*Avg Votes Total:* ${averageNumberVotesTotal}
-*Users Who Voted:* ${usersWhoRated}
-*Voting Users:* ${usernames
-    .sort()
-    .map(u => `@${u}`)
-    .join(', ')}
-  `);
+  let placeCount = 0;
+  allScores.forEach(s => (s.place = ++placeCount));
 
-  let count = 0;
-  allScores.forEach(rel => {
-    rel.averge = rel.points / rel.sources.length;
-    count++;
-    // const entry = sprintf(
-    //   '%2s. %s - %s [%s]',
-    //   count,
-    //   rel.artist,
-    //   rel.album,
-    //   rel.slug,
-    // );
-    const entry = sprintf(
-      '%2s. *%s* - _%s_ %.01f/10 (%s votes; %.01f) %s',
-      count,
-      rel.artist,
-      rel.album,
-      rel.averageRating,
-      rel.votesForItem,
-      rel.bayesianWeightedRank,
-      rel.url || '',
-    );
-    // const entry = sprintf(
-    //   '%2s. *%s* - _%s_ %.01f/10 (%s votes; %.01f)',
-    //   count,
-    //   rel.artist,
-    //   rel.album,
-    //   rel.averageRating,
-    //   rel.votesForItem,
-    //   rel.bayesianWeightedRank,
-    // );
-    report.push(entry);
+  const usernames = allVotingUsernames
+    .sort((a: string, b: string) => {
+      if (a.toLowerCase() < b.toLocaleLowerCase()) {
+        return -1;
+      } else if (a.toLowerCase() > b.toLocaleLowerCase()) {
+        return 1;
+      }
+      return 0;
+    })
+    .map(u => `@${u}`);
+
+  const totals = {
+    totalVotesCast,
+    totalRatings,
+    totalAverageRating,
+    averageNumberVotesTotal,
+    usersWhoRated,
+    usernames,
+  };
+
+  const reportData = {
+    totals,
+    picks: allScores,
+  };
+
+  console.log('Reporting...');
+
+  const slackRendered = await render('slack', reportData);
+
+  await fs.writeFile('rendered/2019-slacker-picks.md', slackRendered, {
+    encoding: 'utf8',
   });
 
-  console.log(report.join('\n'));
-  return report.join('\n');
+  const htmlRendered = await render('html', reportData);
+
+  await fs.writeFile('rendered/2019-slacker-picks.html', htmlRendered, {
+    encoding: 'utf8',
+  });
+
+  console.log('Done!');
+
+  // console.log(slackRendered);
 }
 
 main();
