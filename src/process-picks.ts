@@ -7,6 +7,7 @@ import XLSX from 'xlsx';
 import unidecode from 'unidecode';
 import Handlebars from 'handlebars';
 import { sprintf } from 'sprintf-js';
+import levenshtein from 'fast-levenshtein';
 
 const fs = {
   readFile: util.promisify(cbfs.readFile),
@@ -119,6 +120,38 @@ async function render(templateName: string, data): Promise<string> {
   return tmpl(data);
 }
 
+interface CloseWords {
+  word: string;
+  closest: {
+    [key: number]: string[];
+  };
+}
+
+const findClosest = (items: string[], threshold = 5): CloseWords[] => {
+  const list: CloseWords[] = [];
+
+  items.forEach(word => {
+    const c: CloseWords = {
+      word,
+      closest: {},
+    };
+
+    items.forEach(chkWord => {
+      const d = levenshtein.get(word, chkWord);
+      if (d !== 0 && d <= threshold) {
+        if (typeof c.closest[d] === 'undefined') {
+          c.closest[d] = [];
+        }
+        c.closest[d].push(chkWord);
+      }
+    });
+    if (Object.keys(c.closest).length >= 1) {
+      list.push(c);
+    }
+  });
+  return list;
+};
+
 async function main(): Promise<void> {
   const report: string[] = [];
   const defaultURL =
@@ -130,14 +163,14 @@ async function main(): Promise<void> {
   const skip: number =
     typeof argv.skip === 'undefined' ? 1 : parseInt(argv.skip as string, 10);
 
-  console.log('Fetching data...');
+  process.stdout.write('Fetching data...');
   const res = await fetch(url);
   const raw: Buffer = await res.buffer();
-  console.log(`...fetched ${(raw.length / 1024).toFixed(1)}Kbytes`);
-  console.log('Reading workbook...');
+  console.log(` fetched ${(raw.length / 1024).toFixed(1)}Kbytes`);
+  process.stdout.write('Reading workbook...');
   const wb: XLSX.WorkBook = XLSX.read(raw, { type: 'buffer' });
   console.log(
-    `Read ${wb.SheetNames.length} worksheet${
+    ` read ${wb.SheetNames.length} worksheet${
       wb.SheetNames.length === 1 ? '' : 's'
     }`,
   );
@@ -156,6 +189,7 @@ async function main(): Promise<void> {
   const MAX_ALBUMS = 10;
   let usersWhoRated = 0;
   const allVotingUsernames: string[] = [];
+  console.log('Processing Slacker Picks:');
   sheets.forEach(s => {
     const member: MemberRatings = {
       raw: s.sheet,
@@ -166,7 +200,7 @@ async function main(): Promise<void> {
     membersByName[s.name] = member;
     // Skips sheets with leading underscore
     if (/^[^_]/.test(s.name)) {
-      console.log(`Processing ${s.name}...`);
+      process.stdout.write(` * Processing ${s.name}...`);
       usersWhoRated++;
       allVotingUsernames.push(s.name);
       for (let row = 1 + skip; row < MAX_ALBUMS + 1 + skip; row++) {
@@ -201,6 +235,7 @@ async function main(): Promise<void> {
           scores[slug].sources.push(score);
         }
       }
+      console.log(' done.');
     }
   });
 
@@ -208,7 +243,7 @@ async function main(): Promise<void> {
   let totalRatings = 0;
 
   console.log('');
-  console.log('Calculating album averages...');
+  process.stdout.write('Calculating album averages...');
   Object.keys(scores).forEach(slug => {
     scores[slug].votesForItem = scores[slug].sources.length;
     scores[slug].totalScoreForItem = scores[slug].sources.reduce(
@@ -220,36 +255,40 @@ async function main(): Promise<void> {
     scores[slug].averageRating =
       scores[slug].totalScoreForItem / scores[slug].votesForItem;
 
-    console.log(
-      `${slug} => ${'☑'.repeat(scores[slug].sources.length)} => ${scores[
-        slug
-      ].averageRating.toFixed(1)}/10`,
-    );
+    // console.log(
+    //   `${slug} => ${'☑'.repeat(scores[slug].sources.length)} => ${scores[
+    //     slug
+    //   ].averageRating.toFixed(1)}/10`,
+    // );
   });
 
-  console.log('Calculating total average rating...');
+  console.log(' done.');
+
+  process.stdout.write('Calculating total average rating...');
   const totalAverageRating =
     Object.keys(scores)
       .map(s => scores[s].averageRating)
       .reduce((p, c) => p + c, 0) / Object.keys(scores).length;
   const averageNumberVotesTotal = totalVotesCast / Object.keys(scores).length;
+  console.log(' done.');
 
-  console.log('Weighting rankings...');
+  process.stdout.write('Weighting rankings...');
   Object.keys(scores).forEach(slug => {
     const item = scores[slug];
     scores[slug].bayesianWeightedRank =
       (averageNumberVotesTotal * totalAverageRating +
         item.votesForItem * item.totalScoreForItem) /
       (averageNumberVotesTotal + item.votesForItem);
-    console.log(
-      `${slug} => ${item.averageRating.toFixed(1)}/10 via ${
-        item.votesForItem
-      } votes ∴ ${item.bayesianWeightedRank.toFixed(1)}`,
-    );
+    // console.log(
+    //   `${slug} => ${item.averageRating.toFixed(1)}/10 via ${
+    //     item.votesForItem
+    //   } votes ∴ ${item.bayesianWeightedRank.toFixed(1)}`,
+    // );
   });
+  console.log(' done.');
 
   console.log('');
-  console.log('Sorting...');
+  process.stdout.write('Sorting...');
 
   const allScores: AlbumRating[] = [];
   Object.keys(scores).forEach(slug => {
@@ -271,6 +310,7 @@ async function main(): Promise<void> {
     }
     return 0;
   });
+  console.log(' done.');
 
   let placeCount = 0;
   allScores.forEach(s => (s.place = ++placeCount));
@@ -300,7 +340,31 @@ async function main(): Promise<void> {
     picks: allScores,
   };
 
-  console.log('Reporting...');
+  console.log('Doing artists misspell checks...');
+  const artists = Object.keys(scores).map(slug => scores[slug].artist);
+  const artistChecks = findClosest(artists, 5);
+  artistChecks.forEach(ac => {
+    console.log(`  * ${ac.word}`);
+    Object.keys(ac.closest).forEach(dist => {
+      console.log(`     ${dist}: ${ac.closest[dist].join(', ')}`);
+    });
+  });
+  console.log('...done');
+  console.log('');
+
+  console.log('Doing album misspell checks...');
+  const albums = Object.keys(scores).map(slug => scores[slug].album);
+  const albumChecks = findClosest(albums, 5);
+  albumChecks.forEach(ac => {
+    console.log(`  * ${ac.word}`);
+    Object.keys(ac.closest).forEach(dist => {
+      console.log(`     ${dist}: ${ac.closest[dist].join(', ')}`);
+    });
+  });
+  console.log('...done');
+  console.log('');
+
+  process.stdout.write('Reporting...');
 
   const slackRendered = await render('slack', reportData);
 
@@ -314,7 +378,7 @@ async function main(): Promise<void> {
     encoding: 'utf8',
   });
 
-  console.log('Done!');
+  console.log('...done!');
 
   // console.log(slackRendered);
 }

@@ -6,15 +6,21 @@
   "author": "Don",
   "license": "MIT",
   "scripts": {
-    "build": "./node_modules/.bin/tsc",
-    "build:watch": "yarn build -w",
-    "start": "node dist/process-picks.js",
+    "build": "./node_modules/.bin/tsc -sourcemap",
+    "build:watch": "yarn build -w -sourcemap",
+    "list-process": "node dist/process-picks.js",
+    "bc-pull": "node --max-old-space-size=8192 dist/bandcamp-pull.js",
     "lint": "tsc --noEmit && eslint '*/**/*.{js,ts,tsx}' --quiet",
     "lint:fix": "yarn lint --fix"
   },
   "dependencies": {
+    "cheerio": "^1.0.0-rc.3",
+    "date-fns": "^2.16.1",
+    "fast-levenshtein": "^3.0.0",
     "handlebars": "^4.5.3",
+    "js-sha256": "^0.9.0",
     "node-fetch": "^2.6.0",
+    "source-map-support": "^0.5.19",
     "sprintf-js": "^1.1.2",
     "typescript": "^3.7.3",
     "unidecode": "^0.1.8",
@@ -22,9 +28,13 @@
     "yargs": "^15.0.2"
   },
   "devDependencies": {
+    "@types/cheerio": "^0.22.22",
+    "@types/date-fns": "^2.6.0",
+    "@types/fast-levenshtein": "^0.0.1",
     "@types/handlebars": "^4.1.0",
     "@types/node": "^12.12.14",
     "@types/node-fetch": "^2.5.4",
+    "@types/source-map-support": "^0.5.3",
     "@types/sprintf-js": "^1.1.2",
     "@types/xlsx": "^0.0.36",
     "@types/yargs": "^13.0.3",
