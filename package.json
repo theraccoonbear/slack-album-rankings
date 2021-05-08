@@ -13,7 +13,7 @@
     "lint:fix": "yarn lint --fix"
   },
   "dependencies": {
-    "handlebars": "^4.5.3",
+    "handlebars": "^4.7.7",
     "node-fetch": "^2.6.0",
     "sprintf-js": "^1.1.2",
     "typescript": "^3.7.3",
