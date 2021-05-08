@@ -336,6 +336,7 @@ async function main(): Promise<void> {
   };
 
   const reportData = {
+    year: new Date().getFullYear(),
     totals,
     picks: allScores,
   };
@@ -368,15 +369,23 @@ async function main(): Promise<void> {
 
   const slackRendered = await render('slack', reportData);
 
-  await fs.writeFile('rendered/2020-slacker-picks.md', slackRendered, {
-    encoding: 'utf8',
-  });
+  await fs.writeFile(
+    `rendered/${reportData.year}-slacker-picks.md`,
+    slackRendered,
+    {
+      encoding: 'utf8',
+    },
+  );
 
   const htmlRendered = await render('html', reportData);
 
-  await fs.writeFile('rendered/2020-slacker-picks.html', htmlRendered, {
-    encoding: 'utf8',
-  });
+  await fs.writeFile(
+    `rendered/${reportData.year}-slacker-picks.html`,
+    htmlRendered,
+    {
+      encoding: 'utf8',
+    },
+  );
 
   console.log('...done!');
 

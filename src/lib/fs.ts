@@ -9,6 +9,7 @@ const fs = {
   unlink: util.promisify(cbfs.unlink),
   copyFile: util.promisify(cbfs.copyFile),
   mkdir: util.promisify(cbfs.mkdir),
+  stat: util.promisify(cbfs.stat),
 };
 
 export default fs;

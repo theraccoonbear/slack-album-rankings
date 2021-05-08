@@ -5,12 +5,13 @@ const main = async () => {
   const bc = new BandcampController('./cache');
   const mc = new MetallumController('./cache');
 
-  const res = await mc.searchBand('svrm');
+  const bands = await mc.searchBand('Death');
+  // console.log(JSON.stringify(bands, null, 2));
 
-  // const res = await bc.pullRelease(
-  //   'https://andoceans.bandcamp.com/album/cosmic-world-mother',
-  // );
-  console.log(JSON.stringify(res, null, 2));
+  if (bands.results.length) {
+    const band = await mc.getBand(bands.results[0].id);
+    console.log(band);
+  }
 };
 
 main();
