@@ -10,7 +10,8 @@
     "build:watch": "./node_modules/.bin/tsc -w",
     "start": "node dist/process-picks.js",
     "lint": "tsc --noEmit && eslint '*/**/*.{js,ts,tsx}' --quiet",
-    "lint:fix": "yarn lint --fix"
+    "lint:fix": "yarn lint --fix",
+    "send:it": "npm run start && scp rendered/*-slacker-picks.html theracco@theraccoonshare.com:/home3/theracco/public_html/slack"
   },
   "dependencies": {
     "handlebars": "^4.5.3",
