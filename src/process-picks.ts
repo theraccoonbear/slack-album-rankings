@@ -287,6 +287,8 @@ async function main(): Promise<void> {
     })
     .map(u => `@${u}`);
 
+  const year = (new Date()).getFullYear();
+
   const totals = {
     totalVotesCast,
     totalRatings,
@@ -299,19 +301,20 @@ async function main(): Promise<void> {
   const reportData = {
     totals,
     picks: allScores,
+    year,
   };
 
-  console.log('Reporting...');
+  console.log(`Reporting on ${year}...`);
 
   const slackRendered = await render('slack', reportData);
 
-  await fs.writeFile('rendered/2021-slacker-picks.md', slackRendered, {
+  await fs.writeFile(`rendered/${year}-slacker-picks.md`, slackRendered, {
     encoding: 'utf8',
   });
 
   const htmlRendered = await render('html', reportData);
 
-  await fs.writeFile('rendered/2021-slacker-picks.html', htmlRendered, {
+  await fs.writeFile(`rendered/${year}-slacker-picks.html`, htmlRendered, {
     encoding: 'utf8',
   });
 
