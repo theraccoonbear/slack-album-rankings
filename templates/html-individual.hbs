@@ -1,0 +1,24 @@
+<html>
+  <head>
+    <title>{{ slacker }}'s {{ year }} Picks</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" />
+    <meta charset="utf-8"/>
+  </head>
+  <body>
+    <div class="container">
+      <div class="row">
+        <div class="col-xs-12">
+          <h1>{{ slacker }}'s {{year}} Picks</h1>
+          <br/>
+          <ol>
+          {{#each picks}}
+            <li>{{#if url}}<a href="{{url}}" target="_blank">{{/if}}<strong>{{artist}}</strong> - <em>{{album}}</em>{{#if url}}</a>{{/if}}</li>
+          {{/each}}
+          </ol>
+          <br/>
+          <em><a href="../{{ year }}-slacker-picks.html">&larr; Back</a> to all {{ year }} Slacker Picks</a></em>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

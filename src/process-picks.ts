@@ -46,6 +46,7 @@ interface MemberRatings {
   raw: XLSX.WorkSheet;
   name: string;
   bySlug: { [key: string]: number };
+  byScore: AlbumRating[];
 }
 interface ColMap {
   [key: string]: string;
@@ -91,7 +92,7 @@ function makeSlug(thing: string | string[]): string {
     .replace(/[^a-z]+/gi, '-');
 }
 
-function getBaseRating(): AlbumRating {
+function getBaseRating(start?: any): AlbumRating {
   return {
     points: 0,
     sources: [],
@@ -106,6 +107,7 @@ function getBaseRating(): AlbumRating {
     bayesianWeightedRank: 0,
     averge: 0,
     place: 0,
+    ...start,
   };
 }
 
@@ -120,7 +122,8 @@ async function render(templateName: string, data): Promise<string> {
 }
 
 async function main(): Promise<void> {
-  const report: string[] = [];
+  const year = (new Date()).getFullYear();
+  // const report: string[] = [];
   const defaultURL =
     'https://docs.google.com/spreadsheets/d/e/2PACX-1vRrrFtbjIjtI_9ZR1kmh11FH0VohFUMzd2Zz3w4LB5rvQsTo4BjgOKvTxN0_GQep_j43cWXnoAfvYfp/pub?output=xlsx';
     // 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSmvIToF9J1-yPYu8UK6KOf1Pp7xGGjepV1YfbFoa66qNpRJlu6_g8tQJEQL4HuP1osytuMXkgJN93t/pub?output=xlsx';
@@ -151,7 +154,7 @@ async function main(): Promise<void> {
     return cs;
   });
 
-  const membersByName = {};
+  const membersByName: { [ key: string ]: MemberRatings } = {};
   const scores: AlbumRatingsCollection = {};
 
   const MAX_ALBUMS = 10;
@@ -162,6 +165,7 @@ async function main(): Promise<void> {
       raw: s.sheet,
       name: s.name,
       bySlug: {},
+      byScore: [],
     };
 
     membersByName[s.name] = member;
@@ -198,6 +202,9 @@ async function main(): Promise<void> {
           if (url && !!url !== false && url !== 'false') {
             scores[slug].url = url;
           }
+          const userEntry = getBaseRating(scores[slug]);
+          userEntry.points = score;
+          member.byScore.push(userEntry);
           scores[slug].points += score;
           scores[slug].sources.push(score);
         }
@@ -210,7 +217,7 @@ async function main(): Promise<void> {
 
   console.log('');
   console.log('Calculating album averages...');
-  Object.keys(scores).forEach(slug => {
+  Object.keys(scores).sort().forEach(slug => {
     scores[slug].votesForItem = scores[slug].sources.length;
     scores[slug].totalScoreForItem = scores[slug].sources.reduce(
       (p, c) => p + c,
@@ -280,14 +287,27 @@ async function main(): Promise<void> {
     .sort((a: string, b: string) => {
       if (a.toLowerCase() < b.toLocaleLowerCase()) {
         return -1;
-      } else if (a.toLowerCase() > b.toLocaleLowerCase()) {
+      } else if (a.toLowerCase() > b.toLowerCase  ()) {
         return 1;
       }
       return 0;
     })
     .map(u => `@${u}`);
-
-  const year = (new Date()).getFullYear();
+  console.log('Rendering individual lists...');
+  await Promise.all(allVotingUsernames.map(async u => {
+    const m = membersByName[u];
+    const data = {
+      picks: m.byScore,
+      year,
+      slacker: u,
+    };
+    const rep = await render('html-individual', data);
+    const slug = makeSlug(u);
+    const path = `rendered/individual/${year}-${slug}-picks.html`;
+    await fs.writeFile(path, rep);
+    console.log(`  * ${u} (${path})`);
+  }));
+  console.log('...done');
 
   const totals = {
     totalVotesCast,
@@ -295,7 +315,7 @@ async function main(): Promise<void> {
     totalAverageRating,
     averageNumberVotesTotal,
     usersWhoRated,
-    usernames,
+    usernames: usernames.map(u => `<a href="individual/${year}-${makeSlug(u.slice(1))}-picks.html">${u}</a>`),
   };
 
   const reportData = {

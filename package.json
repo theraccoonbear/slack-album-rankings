@@ -11,7 +11,7 @@
     "start": "node dist/process-picks.js",
     "lint": "tsc --noEmit && eslint '*/**/*.{js,ts,tsx}' --quiet",
     "lint:fix": "yarn lint --fix",
-    "send:it": "npm run start && scp rendered/*-slacker-picks.html theracco@theraccoonshare.com:/home3/theracco/public_html/slack"
+    "send:it": "npm run start && scp -r rendered/* theracco@theraccoonshare.com:/home3/theracco/public_html/slack"
   },
   "dependencies": {
     "handlebars": "^4.5.3",

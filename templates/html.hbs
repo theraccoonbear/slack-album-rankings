@@ -15,12 +15,12 @@
           <strong>Avg Rating Total:</strong> {{totalAverageRating}}<br>
           <strong>Avg Votes Total:</strong> {{averageNumberVotesTotal}}<br>
           <strong>Users Who Voted:</strong> {{usersWhoRated}}<br>
-          <strong>Voting Users:</strong> {{joiner usernames ', '}}<br>
+          <strong>Voting Users:</strong> {{{ joiner usernames ', '}}}<br>
           {{/totals}}
-
+          <br/>
           <ol>
           {{#each picks}}
-            <li>{{#if url}}<a href="{{url}}" target="_blank">{{/if}}<strong>{{artist}}</strong> - <em>{{album}}</em> {{sprintf '%0.1f' averageRating}}/10 ({{votesForItem}} votes; {{sprintf '%0.1f' bayesianWeightedRank}}){{#if url}}</a>{{/if}}</li>
+            <li>{{#if url}}<a href="{{url}}" target="_blank">{{/if}}<strong>{{artist}}</strong> - <em>{{album}}</em>{{#if url}}</a>{{/if}} {{sprintf '%0.1f' averageRating}}/10 ({{votesForItem}} votes; {{sprintf '%0.1f' bayesianWeightedRank}})</li>
           {{/each}}
           </ol>
         </div>
