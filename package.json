@@ -19,7 +19,7 @@
     "sprintf-js": "^1.1.2",
     "typescript": "^3.7.3",
     "unidecode": "^0.1.8",
-    "xlsx": "^0.15.3",
+    "xlsx": "^0.17.0",
     "yargs": "^15.0.2"
   },
   "devDependencies": {
